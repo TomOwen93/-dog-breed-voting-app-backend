@@ -4,6 +4,7 @@ import express from "express";
 import { Client } from "pg";
 import { getEnvVarOrFail } from "./support/envVarUtils";
 import { setupDBClientConfig } from "./support/setupDBClientConfig";
+import morgan from "morgan";
 
 dotenv.config(); //Read .env file lines as though they were env vars.
 
@@ -11,8 +12,12 @@ const dbClientConfig = setupDBClientConfig();
 const client = new Client(dbClientConfig);
 
 //Configure express routes
+
+const logger = morgan;
+
 const app = express();
 
+app.use(logger("tiny"));
 app.use(express.json()); //add JSON body parser to each following route handler
 app.use(cors()); //add CORS support to each following route handler
 
@@ -23,7 +28,7 @@ app.get("/", async (_req, res) => {
 app.get("/leaderboard", async (_req, res) => {
     try {
         const queryText =
-            "SELECT * FROM BreedVotes LIMIT 10 ORDER BY votes DESC";
+            "SELECT * FROM BreedVotes ORDER BY Votes DESC LIMIT 10";
         const result = await client.query(queryText);
 
         res.status(200).json(result.rows);
@@ -33,9 +38,17 @@ app.get("/leaderboard", async (_req, res) => {
 });
 
 app.post("/breeds/:name", async (req, res) => {
-    const queryText =
-        "INSERT INTO BreedVotes(BreedName) VALUES ($1) ON CONFLICT (BreedName) DO UPDATE SET Votes = BreedVotes.Votes+1";
-    const values = [req.params.name];
+    try {
+        const queryText =
+            "INSERT INTO BreedVotes(BreedName) VALUES ($1) ON CONFLICT (BreedName) DO UPDATE SET Votes = BreedVotes.Votes+1 RETURNING *";
+        const values = [req.params.name];
+
+        const result = await client.query(queryText, values);
+
+        res.status(200).json(result.rows);
+    } catch (error) {
+        res.status(500).send("An error occurred. Check server logs.");
+    }
 });
 
 app.get("/health-check", async (_req, res) => {
