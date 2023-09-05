@@ -20,6 +20,24 @@ app.get("/", async (_req, res) => {
     res.json({ msg: "Hello! There's nothing interesting for GET /" });
 });
 
+app.get("/leaderboard", async (_req, res) => {
+    try {
+        const queryText =
+            "SELECT * FROM BreedVotes LIMIT 10 ORDER BY votes DESC";
+        const result = await client.query(queryText);
+
+        res.status(200).json(result.rows);
+    } catch (error) {
+        res.status(500).send("An error occurred. Check server logs.");
+    }
+});
+
+app.post("/breeds/:name", async (req, res) => {
+    const queryText =
+        "INSERT INTO BreedVotes(BreedName) VALUES ($1) ON CONFLICT (BreedName) DO UPDATE SET Votes = BreedVotes.Votes+1";
+    const values = [req.params.name];
+});
+
 app.get("/health-check", async (_req, res) => {
     try {
         //For this to be successful, must connect to db
